@@ -1,0 +1,163 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=gb2312">
+<title>屏幕抓词的技术实现</title>
+<meta name="GENERATOR" content="Microsoft FrontPage 3.0">
+</head>
+
+<body>
+
+<p><br>
+屏幕抓词的技术实现 <br>
+<br>
+周天舒 <br>
+<br>
+　　屏幕上的文字大都是由gdi32.dll的以下几个函数显示的：TextOutA、TextOutW、ExtTextOutA、ExtTextOutW。实现屏幕抓词的关键就是截获对这些函数的调用，得到程序发给它们的参数。<br>
+<br>
+　　我的方法有以下三个步骤：<br>
+<br>
+　　一、得到鼠标的当前位置<br>
+<br>
+　　通过SetWindowsHookEx实现。<br>
+<br>
+　　二、向鼠标下的窗口发重画消息，让它调用系统函数重画<br>
+<br>
+　　通过WindowFromPoint，ScreenToClient，InvalidateRect 实现。<br>
+<br>
+　　三、截获对系统函数的调用，取得参数(以TextOutA为例)<br>
+<br>
+　　1.仿照TextOutA作成自己的函数MyTextOutA，与TextOutA有相同参数和返回值，放在系统钩子所在的DLL里。<br>
+<br>
+　　SysFunc1=(DWORD)GetProcAddress(GetModuleHandle(&quot;gdi32.dll&quot;),&quot;TextOutA&quot;);<br>
+<br>
+　　BOOL WINAPI MyTextOutA(HDC hdc, int nXStart, int nYStart, LPCSTR lpszString,int 
+cbString)<br>
+<br>
+　　{ //输出lpszString的处理<br>
+<br>
+return ((FARPROC)SysFunc1)(hdc,nXStart,nYStart,lpszString,cbString);}<br>
+<br>
+　　2.由于系统鼠标钩子已经完成注入其它GUI进程的工作，我们不需要为注入再做工作。<br>
+<br>
+　　如果你知道所有系统钩子的函数必须要在动态库里，就不会对“注入”感到奇怪。当进程隐式或显式调用一个动态库里的函数时，系统都要把这个动态库映射到这个进程的虚拟地址空间里(以下简称“地址空间”)。这使得DLL成为进程的一部分，以这个进程的身份执行，使用这个进程的堆栈(见图1)。<br>
+<br>
+<br>
+　　图1 DLL映射到虚拟地址空间中<br>
+<br>
+　　对系统钩子来说，系统自动将包含“钩子回调函数”的DLL映射到受钩子函数影响的所有进程的地址空间中，即将这个DLL注入了那些进程。<br>
+<br>
+　　3.当包含钩子的DLL注入其它进程后，寻找映射到这个进程虚拟内存里的各个模块（EXE和DLL）的基地址。EXE和DLL被映射到虚拟内存空间的什么地方是由它们的基地址决定的。它们的基地址是在链接时由链接器决定的。当你新建一个Win32工程时，VC＋＋链接器使用缺省的基地址0x00400000。可以通过链接器的BASE选项改变模块的基地址。EXE通常被映射到虚拟内存的0x00400000处，DLL也随之有不同的基地址，通常被映射到不同进程的相同的虚拟地址空间处。<br>
+<br>
+　　如何知道EXE和DLL被映射到哪里了呢？<br>
+<br>
+　　在Win32中，HMODULE和HINSTANCE是相同的。它们就是相应模块被装入进程的虚拟内存空间的基地址。比如：<br>
+<br>
+　　HMODULE hmodule=GetModuleHandle(″gdi32.dll″);<br>
+<br>
+　　返回的模块句柄强制转换为指针后，就是gdi32.dll被装入的基地址。<br>
+<br>
+　　关于如何找到虚拟内存空间映射了哪些DLL？我用如下方式实现：<br>
+<br>
+while(VirtualQuery (base, ＆mbi, sizeof (mbi))〉0) <br>
+<br>
+{ if(mbi.Type==MEM—IMAGE) <br>
+<br>
+ChangeFuncEntry((DWORD)mbi.BaseAddress,1); <br>
+<br>
+base=(DWORD)mbi.BaseAddress＋mbi.RegionSize; }<br>
+<br>
+　　4.得到模块的基地址后，根据PE文件的格式穷举这个模块的IMAGE—IMPORT—DESCRIPTOR数组，看是否引入了gdi32.dll。如是，则穷举IMAGE—THUNK—DATA数组，看是否引入了TextOutA函数。<br>
+<br>
+　　5.如果找到，将其替换为相应的自己的函数。<br>
+<br>
+　　系统将EXE和DLL原封不动映射到虚拟内存空间中，它们在内存中的结构与磁盘上的静态文件结构是一样的。即PE 
+(Portable Executable) 文件格式。<br>
+<br>
+　　所有对给定API函数的调用总是通过可执行文件的同一个地方转移。那就是一个模块(可以是EXE或DLL)的输入地址表(import 
+address table)。那里有所有本模块调用的其它DLL的函数名及地址。对其它DLL的函数调用实际上只是跳转到输入地址表，由输入地址表再跳转到DLL真正的函数入口。例如：<br>
+<br>
+<br>
+　　图2 对MessageBox()的调用跳转到输入地址表，从输入地址表再跳转到MessageBox函数<br>
+<br>
+<br>
+<br>
+　　IMAGE—IMPORT—DESCRIPTOR和IMAGE—THUNK—DATA分别对应于DLL和函数。它们是PE文件的输入地址表的格式（数据结构参见winnt.h）。<br>
+<br>
+　　BOOL ChangeFuncEntry(HMODULE hmodule)<br>
+<br>
+　　{ PIMAGE—DOS—HEADER pDOSHeader;<br>
+<br>
+　　PIMAGE—NT—HEADERS pNTHeader;<br>
+<br>
+　　PIMAGE—IMPORT—DESCRIPTOR pImportDesc;<br>
+<br>
+/get system functions and my functions′entry/<br>
+<br>
+　　pSysFunc1=(DWORD)GetProcAddress(GetModuleHandle(″gdi32.dll″),″TextOutA″);<br>
+<br>
+　　pMyFunc1= (DWORD)GetProcAddress(GetModuleHandle(″hookdll.dll″),″MyTextOutA″);<br>
+<br>
+pDOSHeader=(PIMAGE—DOS—HEADER)hmodule;<br>
+<br>
+　　if (IsBadReadPtr(hmodule, sizeof(PIMAGE—NT—HEADERS)))<br>
+<br>
+　　 return FALSE;<br>
+<br>
+　　if (pDOSHeader－〉e—magic != IMAGE—DOS—SIGNATURE)<br>
+<br>
+　　 return FALSE;<br>
+<br>
+　　pNTHeader=(PIMAGE—NT—HEADERS)((DWORD)pDOSHeader＋(DWORD)pDOSHeader－〉e—lfanew);<br>
+<br>
+　　if (pNTHeader－〉Signature != IMAGE—NT—SIGNATURE)<br>
+<br>
+　　 return FALSE;<br>
+<br>
+　　pImportDesc = (PIMAGE—IMPORT—DESCRIPTOR)((DWORD)hmodule＋(DWORD)pNTHeader－〉OptionalHeader.DataDirectory<br>
+<br>
+　　 [IMAGE—DIRECTORY—ENTRY—IMPORT].VirtualAddress);<br>
+<br>
+　　if (pImportDesc == (PIMAGE—IMPORT—DESCRIPTOR)pNTHeader) <br>
+<br>
+return FALSE;<br>
+<br>
+　　while (pImportDesc－〉Name) <br>
+<br>
+　　{ PIMAGE—THUNK—DATA pThunk;<br>
+<br>
+　　strcpy(buffer,(char)((DWORD)hmodule＋(DWORD)pImportDesc－〉Name));<br>
+<br>
+CharLower(buffer);<br>
+<br>
+if(strcmp(buffer,&quot;gdi32.dll&quot;))<br>
+<br>
+{ pImportDesc＋＋;<br>
+<br>
+continue;<br>
+<br>
+}else <br>
+<br>
+{ pThunk=(PIMAGE—THUNK—DATA)((DWORD)hmodule＋(DWORD)pImportDesc－〉FirstThunk);<br>
+<br>
+while (pThunk－〉u1.Function) <br>
+<br>
+{ if ((pThunk－〉u1.Function) == pSysFunc1) <br>
+<br>
+{ VirtualProtect((LPVOID)(＆pThunk－〉u1.Function), <br>
+<br>
+　　 sizeof(DWORD),PAGE—EXECUTE—READWRITE, ＆dwProtect); <br>
+<br>
+　　 (pThunk－〉u1.Function)=pMyFunc1;<br>
+<br>
+　　 VirtualProtect((LPVOID)(＆pThunk－〉u1.Function), sizeof(DWORD),dwProtect,＆temp); 
+}<br>
+<br>
+pThunk＋＋; } return 1;}}}<br>
+<br>
+　　替换了输入地址表中TextOutA的入口为MyTextOutA后，截获系统函数调用的主要部分已经完成，当一个被注入进程调用TextOutA时，其实调用的是MyTextOutA，只需在MyTextOutA中显示传进来的字符串，再交给TextOutA处理即可。<br>
+<br>
+&nbsp;&nbsp;&nbsp; 好了，关于屏幕取词的技术要点就讲得差不多了，在此给出一个用VC编写的<a
+href="../code/pmqc.zip">例子程序</a>供大家研究。</p>
+</body>
+</html>

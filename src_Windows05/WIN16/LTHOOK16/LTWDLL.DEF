@@ -1,0 +1,9 @@
+LIBRARY			LTHOOK16
+DESCRIPTION		'DLL of Little English-Chinese Translator version 0.99.001'
+
+EXETYPE			WINDOWS
+STUB		   	'c:\gt\bc31\bin\winstub.EXE'
+
+CODE 			PRELOAD FIXED DISCARDABLE
+DATA			PRELOAD MOVEABLE SINGLE
+

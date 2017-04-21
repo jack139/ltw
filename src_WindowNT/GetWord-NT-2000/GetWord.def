@@ -1,0 +1,13 @@
+EXPORTS
+	BL_SetFlag32	@1
+	BL_GetText32	@2
+	BL_GetBuffer16 @3
+	NHBitBlt @4
+	NHTextOutA @5
+	NHTextOutW @6
+	NHExtTextOutA @7
+	NHExtTextOutW @8
+	NHHookWin32Api @9
+	NHUnHookWin32Api @10
+	ResetNHW32 @11
+	SetNHW32 @12

@@ -1,0 +1,63 @@
+<html>
+<body>
+<pre>
+<h1>Build Log</h1>
+<h3>
+--------------------Configuration: GetWord - Win32 Release--------------------
+</h3>
+<h3>Command Lines</h3>
+
+
+
+<h3>Results</h3>
+nhw32.dll - 0 error(s), 0 warning(s)
+<h3>
+--------------------Configuration: lthook32 - Win32 Release--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSPF2.tmp" with contents
+[
+kernel32.lib user32.lib gdi32.lib winspool.lib uuid.lib ..\ltw32d\release\ltw32d.lib /nologo /base:"0xbff70000" /version:1.0 /subsystem:windows /dll /incremental:no /pdb:".\Release/Lthook32.pdb" /machine:I386 /out:"../Release/Lthook32.dll" /implib:".\Release/Lthook32.lib" 
+".\Release\getwords.obj"
+".\Release\Mouhook.obj"
+".\Release\lthook32.res"
+]
+Creating command line "link.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSPF2.tmp"
+<h3>Output Window</h3>
+Linking...
+   Creating library .\Release/Lthook32.lib and object .\Release/Lthook32.exp
+
+
+
+<h3>Results</h3>
+Lthook32.dll - 0 error(s), 0 warning(s)
+<h3>
+--------------------Configuration: ltw32 - Win32 Release--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating temporary file "C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSPF6.tmp" with contents
+[
+kernel32.lib user32.lib gdi32.lib winspool.lib uuid.lib ..\ltw32d\release\ltw32d.lib ..\lthook32\release\lthook32.lib /nologo /subsystem:windows /incremental:no /pdb:".\Release/Ltw32.pdb" /machine:I386 /out:"../Release/Ltw32.exe" 
+".\Release\Ltw.obj"
+".\Release\ltw.res"
+]
+Creating command line "link.exe @C:\DOCUME~1\ADMINI~1\LOCALS~1\Temp\RSPF6.tmp"
+<h3>Output Window</h3>
+Linking...
+
+
+
+<h3>Results</h3>
+Ltw32.exe - 0 error(s), 0 warning(s)
+<h3>
+--------------------Configuration: ltw32d - Win32 Release--------------------
+</h3>
+<h3>Command Lines</h3>
+
+
+
+<h3>Results</h3>
+Ltw32d.dll - 0 error(s), 0 warning(s)
+</pre>
+</body>
+</html>
